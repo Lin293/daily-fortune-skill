@@ -2,502 +2,486 @@
 
 import React, { useEffect, useState } from "react";
 
-type FortuneLevel = "大吉" | "中吉" | "小吉" | "吉" | "凶";
+type FortuneLevel = "大吉" | "中吉" | "小吉" | "吉" | "末吉" | "凶" | "大凶" | string;
 
-interface FortuneResult {
-  level: FortuneLevel;
-  luckyColor: string;
+interface FortuneResponse {
+  date: string;
+  name: string;
+  overall: {
+    level: FortuneLevel;
+    score: number;
+    text: string;
+  };
+  career: {
+    level: FortuneLevel;
+    score: number;
+    text: string;
+  };
+  love: {
+    level: FortuneLevel;
+    score: number;
+    text: string;
+  };
+  luckyColor?: string; // 接口里有就收着，但前端自己算展示色
   luckyNumber: number;
 }
 
-const FORTUNES: FortuneResult[] = [
-  { level: "大吉", luckyColor: "ミルキーピンク", luckyNumber: 3 },
-  { level: "大吉", luckyColor: "やさしいラベンダー", luckyNumber: 8 },
-  { level: "中吉", luckyColor: "クリームホワイト", luckyNumber: 5 },
-  { level: "中吉", luckyColor: "ペールブルー", luckyNumber: 9 },
-  { level: "小吉", luckyColor: "ミントグリーン", luckyNumber: 6 },
-  { level: "小吉", luckyColor: "ハニーイエロー", luckyNumber: 2 },
-  { level: "吉", luckyColor: "ミルクティーベージュ", luckyNumber: 1 },
-  { level: "吉", luckyColor: "さくらいろ", luckyNumber: 7 },
-  { level: "凶", luckyColor: "あわいブルーグレー", luckyNumber: 4 },
+const colorPalette = [
+  "#ffb7c5", // さくらピンク
+  "#ffe0b2", // ミルクティーベージュ
+  "#fff4b2", // たまごイエロー
+  "#c9f4c5", // ミントグリーン
+  "#a7d8ff", // ソーダブルー
+  "#d8c6ff", // ラベンダー
+  "#ffd6e8", // いちごミルク
+  "#ffc8a2", // サンセットオレンジ
 ];
 
-function getTodayKey() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return {
-    key: `daily-fortune-${y}-${m}-${d}`,
-    label: `${y}-${m}-${d}`,
-  };
-}
-
-function pickFortune(): FortuneResult {
-  const index = Math.floor(Math.random() * FORTUNES.length);
-  return FORTUNES[index];
+function getFaceByLevel(level: FortuneLevel): string {
+  if (level.includes("大吉")) return "(๑•̀ㅂ•́)و✧";
+  if (level.includes("吉")) return "(◍•ᴗ•◍)";
+  if (level.includes("大凶")) return "(x_x)";
+  if (level.includes("凶")) return "(T﹏T)";
+  return "(・◡・)";
 }
 
 export default function Home() {
-  const [fortune, setFortune] = useState<FortuneResult | null>(null);
-  const [dateLabel, setDateLabel] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [fortune, setFortune] = useState<FortuneResponse | null>(null);
+  const [loading, setLoading] = useState(false);
   const [shaking, setShaking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const { key, label } = getTodayKey();
-    setDateLabel(label);
+  async function fetchFortune(withAnimation = false) {
+    try {
+      if (withAnimation) {
+        setShaking(true);
+      }
+      setLoading(true);
+      setError(null);
 
-    if (typeof window === "undefined") return;
-
-    const stored = window.localStorage.getItem(key);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as FortuneResult;
-        setFortune(parsed);
-        setLoading(false);
-        return;
-      } catch {
-        // ignore parse error and regenerate
+      const res = await fetch("/api/daily-fortune");
+      if (!res.ok) {
+        throw new Error("failed to fetch fortune");
+      }
+      const data = (await res.json()) as FortuneResponse;
+      setFortune(data);
+    } catch (e) {
+      console.error(e);
+      setError("おみくじの取得に失敗しました… 少し待ってからもう一度試してください。");
+    } finally {
+      setLoading(false);
+      if (withAnimation) {
+        setTimeout(() => setShaking(false), 650);
       }
     }
+  }
 
-    const newFortune = pickFortune();
-    window.localStorage.setItem(key, JSON.stringify(newFortune));
-    setFortune(newFortune);
-    setLoading(false);
+  useEffect(() => {
+    fetchFortune(false);
   }, []);
 
   const handleShake = () => {
-    if (loading) return;
-    setShaking(true);
-    setTimeout(() => {
-      setShaking(false);
-    }, 700);
+    // 只是重抽动画，接口本身会保证「同一天同一设备是同一支签」
+    fetchFortune(true);
   };
 
-  const levelFace = (level: FortuneLevel) => {
-    switch (level) {
-      case "大吉":
-        return "(๑´ڡ`๑)";
-      case "中吉":
-        return("(๑•͈ᴗ•͈)");
-      case "小吉":
-        return("( ˘ω˘ )");
-      case "吉":
-        return("(｡•̀ᴗ-)✧");
-      case "凶":
-      default:
-        return("(T﹏T)");
-    }
-  };
+  const luckyNumber = fortune?.luckyNumber ?? 7;
+  const luckyColorHex =
+    colorPalette[(luckyNumber - 1 + colorPalette.length * 10) % colorPalette.length];
+
+  const overallLevel: FortuneLevel = fortune?.overall.level ?? "吉";
+  const face = getFaceByLevel(overallLevel);
 
   return (
-    <>
-      <main className="omk-page">
-        {/* 漂浮装饰物 */}
-        <div className="omk-decos">
-          <span className="omk-deco omk-deco-sakura1">🌸</span>
-          <span className="omk-deco omk-deco-sakura2">🌸</span>
-          <span className="omk-deco omk-deco-bell">🎐</span>
-          <span className="omk-deco omk-deco-paw">🫧</span>
+    <div
+      style={{
+        minHeight: "100vh",
+        margin: 0,
+        padding: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "radial-gradient(circle at 0% 0%, #ffd6e8 0, #ffe9cf 28%, #f5f7ff 55%, #e1f3ff 100%)",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "PingFang SC", sans-serif',
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 460,
+          padding: "32px 20px 40px",
+        }}
+      >
+        {/* 顶部 tabs / 标题卡片 */}
+        <div
+          style={{
+            margin: "0 auto 18px",
+            width: 140,
+            height: 40,
+            borderRadius: 999,
+            background:
+              "linear-gradient(135deg, #ff6b6b, #ff9966)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontSize: 15,
+            letterSpacing: "0.12em",
+            fontWeight: 600,
+            boxShadow: "0 10px 25px rgba(255, 137, 98, 0.45)",
+          }}
+        >
+          おみくじ
         </div>
 
-        <div className="omk-card">
-          <div className="omk-card-inner">
-            {/* 标题行 */}
-            <div className="omk-header">
-              <div className="omk-header-dot" />
-              <div className="omk-header-title">今日おみくじ</div>
-              <div className="omk-header-date">
-                {dateLabel.replace(/-/g, "-")}
+        {/* 主卡片 */}
+        <div
+          style={{
+            margin: "0 auto",
+            borderRadius: 32,
+            padding: "26px 28px 30px",
+            background: "rgba(255,255,255,0.94)",
+            boxShadow:
+              "0 18px 40px rgba(182, 137, 255, 0.18), 0 0 0 1px rgba(255,255,255,0.9)",
+            backdropFilter: "blur(18px)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          {/* 卡片内浅色渐变 */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "radial-gradient(circle at 0% 0%, rgba(255,214,232,0.28), transparent 55%), radial-gradient(circle at 100% 100%, rgba(186,223,255,0.28), transparent 55%)",
+              pointerEvents: "none",
+            }}
+          />
+
+          {/* 顶部文案 */}
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: 18,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "999px",
+                    background: "radial-gradient(circle, #ff5f6d 0, #ff9966 55%, #ffb88c 100%)",
+                    boxShadow: "0 0 0 4px rgba(255,153,102,0.18)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    color: "#333",
+                  }}
+                >
+                  今日おみくじ
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  lineHeight: 1.7,
+                  color: "#777",
+                }}
+              >
+                今日はあなたの <span style={{ color: "#ff6b6b", fontWeight: 600 }}>専属一签</span>。<br />
+                このデバイスで、今日はずっとこの一枚だけ。
               </div>
             </div>
-
-            {/* 说明文字 */}
-            <div className="omk-subtext">
-              今日はあなたの
-              <span className="omk-highlight">専属一枚</span>。
-              <br />
-              このデバイスで、今日はずっとこの一枚だけ。
-            </div>
-
-            {/* みくじ卡片 */}
             <div
-              className={
-                "omk-paper-wrapper" + (shaking ? " omk-paper-shake" : "")
-              }
+              style={{
+                fontSize: 12,
+                color: "#999",
+                marginTop: 4,
+              }}
             >
-              <div className="omk-paper-top-tag">おみくじ</div>
-              <div className="omk-paper-face">
-                {fortune ? levelFace(fortune.level) : "(・・；)"}
-              </div>
-              <div className="omk-paper-level">
-                {fortune ? fortune.level : "ひみつ"}
-              </div>
-              <div className="omk-paper-caption">今日のきっぷ</div>
-            </div>
-
-            {/* 信息区 */}
-            <div className="omk-info-row">
-              <div className="omk-info-pill">
-                <div className="omk-info-label">ラッキーカラー</div>
-                <div className="omk-info-value">
-                  {fortune ? fortune.luckyColor : "…"}
-                </div>
-              </div>
-              <div className="omk-info-pill">
-                <div className="omk-info-label">ラッキーナンバー</div>
-                <div className="omk-info-value">
-                  {fortune ? fortune.luckyNumber : "…"}
-                </div>
-              </div>
-            </div>
-
-            {/* 按钮 */}
-            <button
-              className="omk-button"
-              type="button"
-              onClick={handleShake}
-              disabled={loading}
-            >
-              {loading ? "ひみつ準備中…" : "もう一回ひきたい！！ (๑•̀ㅂ•́)و✧"}
-            </button>
-
-            {/* 底部提示 */}
-            <div className="omk-footer">
-              小提示：毎台設備毎日一枚。毎天一支おみくじ。<br />
-              換一個人／換一台設備，抽到的おみくじはきっと違うかも ✨
+              {fortune?.date ?? ""}
             </div>
           </div>
+
+          {/* 中间：签纸本体（带纸纹理） */}
+          <div
+            style={{
+              position: "relative",
+              margin: "18px auto 24px",
+              width: 230,
+              borderRadius: 32,
+              padding: "18px 18px 26px",
+              backgroundImage:
+                "linear-gradient(135deg, rgba(255,255,255,0.98), rgba(255,249,230,0.97)), repeating-linear-gradient(0deg, rgba(255,255,255,0.3) 0px, rgba(255,255,255,0.3) 2px, rgba(248,242,226,0.6) 2px, rgba(248,242,226,0.6) 4px)",
+              boxShadow:
+                "0 16px 28px rgba(255,137,98,0.22), 0 0 0 1px rgba(255,224,190,0.9)",
+              border: "1px solid rgba(255, 220, 180, 0.9)",
+              overflow: "hidden",
+              transition: "transform 0.25s ease-out",
+              transform: shaking ? "translateY(-6px) rotate(-2deg)" : "translateY(0) rotate(0deg)",
+            }}
+          >
+            {/* 纸纹噪点层 */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundImage:
+                  "radial-gradient(circle at 10% 20%, rgba(255,255,255,0.55) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.35) 0, transparent 60%)",
+                opacity: 0.85,
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* 内容 */}
+            <div
+              style={{
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              {/* 上方小签牌 */}
+              <div
+                style={{
+                  padding: "2px 16px",
+                  borderRadius: 999,
+                  background: "rgba(255,198,173,0.9)",
+                  color: "#fff",
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  textIndent: "0.18em",
+                  boxShadow: "0 6px 12px rgba(255,137,98,0.6)",
+                  marginBottom: 4,
+                }}
+              >
+                おみくじ
+              </div>
+
+              {/* 颜文字 */}
+              <div
+                style={{
+                  fontSize: 18,
+                  color: "#999",
+                  marginTop: 2,
+                  marginBottom: 2,
+                }}
+              >
+                {face}
+              </div>
+
+              {/* 大字：大吉 / 吉 / 凶 … */}
+              <div
+                style={{
+                  fontSize: 64,
+                  lineHeight: 1.1,
+                  letterSpacing: "0.12em",
+                  textIndent: "0.12em",
+                  color:
+                    overallLevel.includes("凶") || overallLevel.includes("大凶")
+                      ? "#4285f4"
+                      : "#e67a2e",
+                  textShadow: "0 8px 16px rgba(0,0,0,0.08)",
+                  marginBottom: 2,
+                }}
+              >
+                {overallLevel}
+              </div>
+
+              {/* 小标题 */}
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  letterSpacing: "0.16em",
+                  textIndent: "0.16em",
+                }}
+              >
+                今日のおきっぷ
+              </div>
+            </div>
+          </div>
+
+          {/* 信息区：ラッキーカラー / ラッキーナンバー */}
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              gap: 10,
+              marginBottom: 22,
+            }}
+          >
+            {/* ラッキーカラー */}
+            <div
+              style={{
+                flex: 1,
+                borderRadius: 18,
+                padding: "10px 14px 12px",
+                background: "rgba(255,255,255,0.9)",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.02)",
+                border: "1px solid rgba(246, 230, 255, 0.8)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  marginBottom: 2,
+                }}
+              >
+                ラッキーカラー
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "999px",
+                    background: luckyColorHex,
+                    boxShadow: "0 0 0 3px rgba(255,255,255,0.9), 0 0 10px rgba(0,0,0,0.12)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* ラッキーナンバー */}
+            <div
+              style={{
+                flex: 1,
+                borderRadius: 18,
+                padding: "10px 14px 12px",
+                background: "rgba(255,255,255,0.9)",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.02)",
+                border: "1px solid rgba(255, 230, 210, 0.9)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#999",
+                  marginBottom: 2,
+                }}
+              >
+                ラッキーナンバー
+              </div>
+              <div>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "4px 18px",
+                    borderRadius: 999,
+                    background:
+                      "linear-gradient(135deg, #ffe3c2, #ffd0a5)",
+                    boxShadow: "0 6px 14px rgba(255,137,98,0.3)",
+                    color: "#a54107",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    letterSpacing: "0.16em",
+                    textIndent: "0.16em",
+                  }}
+                >
+                  {luckyNumber}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 按钮 */}
+          <div style={{ position: "relative", marginBottom: 10 }}>
+            <button
+              onClick={handleShake}
+              disabled={loading}
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                borderRadius: 999,
+                padding: "14px 16px",
+                cursor: loading ? "wait" : "pointer",
+                background:
+                  "linear-gradient(135deg, #ff6b6b, #ff8e53)",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textIndent: "0.06em",
+                boxShadow:
+                  "0 16px 30px rgba(255,137,98,0.55), 0 0 0 1px rgba(255,255,255,0.5)",
+                transform: loading ? "translateY(2px) scale(0.99)" : "translateY(0)",
+                transition: "transform 0.16s ease-out, box-shadow 0.16s ease-out, opacity 0.16s",
+                opacity: loading ? 0.78 : 1,
+              }}
+            >
+              {loading ? "しゃかしゃか中… ( ˘ω˘ )" : "もう一回ひきたい！(๑•̀ㅂ•́)ง✧"}
+            </button>
+          </div>
+
+          {/* 小提示 */}
+          <div
+            style={{
+              position: "relative",
+              textAlign: "center",
+              fontSize: 11,
+              lineHeight: 1.6,
+              color: "#b3b3b3",
+            }}
+          >
+            每台设备毎天一签。  
+            换一个人 / 换一台设备，  
+            抽到的签运也许会完全不一样哦 ✨
+          </div>
+
+          {error && (
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 11,
+                color: "#d93025",
+                textAlign: "center",
+              }}
+            >
+              {error}
+            </div>
+          )}
         </div>
-      </main>
-
-      {/* 样式 & 动画 */}
-      <style jsx global>{`
-        .omk-page {
-          min-height: 100vh;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 32px 16px;
-          box-sizing: border-box;
-          position: relative;
-          overflow: hidden;
-          background:
-            radial-gradient(circle at 15% 0%, #ffeef4 0, #ffeef4 25%, transparent 60%),
-            radial-gradient(circle at 85% 100%, #e8f5ff 0, #e8f5ff 30%, transparent 65%),
-            radial-gradient(circle at 50% 50%, #fffaf4 0, #fffaf4 40%, #f9f7ff 100%);
-          backdrop-filter: blur(4px);
-        }
-
-        .omk-decos {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          overflow: hidden;
-        }
-
-        .omk-deco {
-          position: absolute;
-          font-size: 26px;
-          opacity: 0.65;
-          filter: drop-shadow(0 4px 8px rgba(255, 255, 255, 0.7));
-        }
-
-        .omk-deco-sakura1 {
-          top: 14%;
-          left: 8%;
-          animation: omk-float-soft 9s ease-in-out infinite;
-        }
-
-        .omk-deco-sakura2 {
-          bottom: 12%;
-          right: 10%;
-          animation: omk-float-soft 11s ease-in-out infinite;
-        }
-
-        .omk-deco-bell {
-          top: 10%;
-          right: 22%;
-          animation: omk-sway 7s ease-in-out infinite;
-        }
-
-        .omk-deco-paw {
-          bottom: 18%;
-          left: 20%;
-          animation: omk-bubble 13s linear infinite;
-        }
-
-        .omk-card {
-          position: relative;
-          max-width: 480px;
-          width: 100%;
-          z-index: 1;
-        }
-
-        .omk-card-inner {
-          background: radial-gradient(circle at 0% 0%, #fffaf8 0, #ffffff 30%, #fdf9ff 100%);
-          border-radius: 28px;
-          padding: 28px 26px 26px;
-          box-shadow:
-            0 18px 45px rgba(234, 160, 175, 0.18),
-            0 0 0 1px rgba(255, 255, 255, 0.8);
-          backdrop-filter: blur(10px);
-        }
-
-        .omk-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-
-        .omk-header-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          background: radial-gradient(circle, #ff6272 0, #ff3c4f 80%);
-          box-shadow: 0 0 0 4px rgba(255, 99, 132, 0.2);
-          margin-right: 8px;
-        }
-
-        .omk-header-title {
-          flex: 1;
-          font-size: 18px;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          color: #333;
-        }
-
-        .omk-header-date {
-          font-size: 12px;
-          color: #b3b0c1;
-          letter-spacing: 0.06em;
-        }
-
-        .omk-subtext {
-          font-size: 13px;
-          line-height: 1.7;
-          color: #6f6b7a;
-          margin-bottom: 22px;
-        }
-
-        .omk-highlight {
-          color: #ff4b6a;
-          font-weight: 600;
-        }
-
-        .omk-paper-wrapper {
-          position: relative;
-          margin: 0 auto 22px;
-          width: 220px;
-          max-width: 100%;
-          aspect-ratio: 3 / 4;
-          background: linear-gradient(180deg, #f8f5ff 0%, #ffffff 40%, #fef7ff 100%);
-          border-radius: 24px;
-          border: 1px solid rgba(168, 174, 255, 0.3);
-          box-shadow:
-            0 14px 30px rgba(154, 133, 255, 0.18),
-            0 0 0 1px rgba(255, 255, 255, 0.9);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          box-sizing: border-box;
-        }
-
-        .omk-paper-top-tag {
-          position: absolute;
-          top: 12px;
-          left: 50%;
-          transform: translateX(-50%);
-          padding: 4px 16px;
-          border-radius: 999px;
-          font-size: 12px;
-          letter-spacing: 0.22em;
-          color: #ff7f6b;
-          background: linear-gradient(135deg, #ffe0d5, #ffd0ce);
-          box-shadow: 0 6px 18px rgba(255, 169, 140, 0.45);
-        }
-
-        .omk-paper-face {
-          margin-bottom: 8px;
-          font-size: 22px;
-          color: #9d8ce0;
-        }
-
-        .omk-paper-level {
-          font-size: 50px;
-          letter-spacing: 0.18em;
-          text-indent: 0.18em;
-          color: #4f64d8;
-          text-shadow: 0 6px 15px rgba(79, 100, 216, 0.35);
-          margin-bottom: 6px;
-        }
-
-        .omk-paper-caption {
-          font-size: 11px;
-          letter-spacing: 0.22em;
-          color: #9a96b8;
-        }
-
-        .omk-info-row {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-
-        .omk-info-pill {
-          flex: 1;
-          padding: 10px 14px;
-          border-radius: 16px;
-          background: linear-gradient(
-            135deg,
-            rgba(255, 255, 255, 0.92),
-            rgba(250, 244, 255, 0.95)
-          );
-          box-shadow: 0 6px 18px rgba(210, 187, 255, 0.18);
-          border: 1px solid rgba(230, 222, 255, 0.8);
-        }
-
-        .omk-info-label {
-          font-size: 11px;
-          color: #a59fc3;
-          margin-bottom: 2px;
-          letter-spacing: 0.08em;
-        }
-
-        .omk-info-value {
-          font-size: 13px;
-          color: #433c68;
-          font-weight: 600;
-        }
-
-        .omk-button {
-          width: 100%;
-          margin-bottom: 16px;
-          padding: 12px 18px;
-          border-radius: 999px;
-          border: none;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          color: #fff;
-          background: linear-gradient(90deg, #ff6b6b, #ff884d);
-          box-shadow:
-            0 14px 30px rgba(255, 120, 84, 0.45),
-            0 0 0 1px rgba(255, 255, 255, 0.7);
-          transform: translateY(0);
-          transition:
-            box-shadow 0.15s ease-out,
-            transform 0.15s ease-out,
-            filter 0.15s ease-out;
-        }
-
-        .omk-button:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow:
-            0 18px 34px rgba(255, 120, 84, 0.6),
-            0 0 0 1px rgba(255, 255, 255, 0.8);
-          filter: brightness(1.03);
-        }
-
-        .omk-button:disabled {
-          opacity: 0.7;
-          cursor: default;
-        }
-
-        .omk-footer {
-          text-align: center;
-          font-size: 11px;
-          line-height: 1.7;
-          color: #b3afc5;
-        }
-
-        .omk-paper-shake {
-          animation: omk-shake 0.7s ease-in-out;
-        }
-
-        @keyframes omk-shake {
-          0% {
-            transform: translateY(0) rotate(0deg);
-          }
-          20% {
-            transform: translateY(-6px) rotate(-2deg);
-          }
-          40% {
-            transform: translateY(4px) rotate(2deg);
-          }
-          60% {
-            transform: translateY(-3px) rotate(-1deg);
-          }
-          80% {
-            transform: translateY(2px) rotate(1deg);
-          }
-          100% {
-            transform: translateY(0) rotate(0deg);
-          }
-        }
-
-        @keyframes omk-float-soft {
-          0% {
-            transform: translateY(0) translateX(0) rotate(0deg);
-          }
-          50% {
-            transform: translateY(-10px) translateX(6px) rotate(4deg);
-          }
-          100% {
-            transform: translateY(0) translateX(0) rotate(0deg);
-          }
-        }
-
-        @keyframes omk-sway {
-          0% {
-            transform: translateY(0) rotate(0deg);
-          }
-          25% {
-            transform: translateY(4px) rotate(6deg);
-          }
-          50% {
-            transform: translateY(0) rotate(-4deg);
-          }
-          75% {
-            transform: translateY(4px) rotate(3deg);
-          }
-          100% {
-            transform: translateY(0) rotate(0deg);
-          }
-        }
-
-        @keyframes omk-bubble {
-          0% {
-            transform: translateY(12px) scale(0.9);
-            opacity: 0;
-          }
-          20% {
-            opacity: 0.7;
-          }
-          80% {
-            opacity: 0.7;
-          }
-          100% {
-            transform: translateY(-22px) scale(1.05);
-            opacity: 0;
-          }
-        }
-
-        @media (max-width: 600px) {
-          .omk-card-inner {
-            padding: 22px 18px 22px;
-          }
-          .omk-paper-wrapper {
-            width: 200px;
-          }
-        }
-      `}</style>
-    </>
+      </div>
+    </div>
   );
 }
