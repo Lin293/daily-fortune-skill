@@ -1,517 +1,503 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
-type FortuneLevel = '大吉' | '吉' | '小吉' | '凶' | string;
+type FortuneLevel = "大吉" | "中吉" | "小吉" | "吉" | "凶";
 
-type Fortune = {
-  date: string;
-  name: string;
-  overall: {
-    level: FortuneLevel;
-    score: number;
-    text: string;
-  };
-  career: {
-    level: FortuneLevel;
-    score: number;
-    text: string;
-  };
-  love: {
-    level: FortuneLevel;
-    score: number;
-    text: string;
-  };
+interface FortuneResult {
+  level: FortuneLevel;
   luckyColor: string;
   luckyNumber: number;
-};
-
-const EMPTY_FORTUNE: Fortune = {
-  date: '',
-  name: 'あなた',
-  overall: {
-    level: '吉',
-    score: 3,
-    text: '',
-  },
-  career: {
-    level: '吉',
-    score: 3,
-    text: '',
-  },
-  love: {
-    level: '吉',
-    score: 3,
-    text: '',
-  },
-  luckyColor: '',
-  luckyNumber: 0,
-};
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
 }
 
-function levelFace(level: FortuneLevel) {
-  switch (level) {
-    case '大吉':
-      return 'ヽ(✿ﾟ▽ﾟ)ノ';
-    case '吉':
-      return '(*´∀`)♪';
-    case '小吉':
-      return '(◍•ᴗ•◍)';
-    case '凶':
-      return '(╥﹏╥)';
-    default:
-      return '(・ω・)';
-  }
+const FORTUNES: FortuneResult[] = [
+  { level: "大吉", luckyColor: "ミルキーピンク", luckyNumber: 3 },
+  { level: "大吉", luckyColor: "やさしいラベンダー", luckyNumber: 8 },
+  { level: "中吉", luckyColor: "クリームホワイト", luckyNumber: 5 },
+  { level: "中吉", luckyColor: "ペールブルー", luckyNumber: 9 },
+  { level: "小吉", luckyColor: "ミントグリーン", luckyNumber: 6 },
+  { level: "小吉", luckyColor: "ハニーイエロー", luckyNumber: 2 },
+  { level: "吉", luckyColor: "ミルクティーベージュ", luckyNumber: 1 },
+  { level: "吉", luckyColor: "さくらいろ", luckyNumber: 7 },
+  { level: "凶", luckyColor: "あわいブルーグレー", luckyNumber: 4 },
+];
+
+function getTodayKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return {
+    key: `daily-fortune-${y}-${m}-${d}`,
+    label: `${y}-${m}-${d}`,
+  };
 }
 
-function levelColors(level: FortuneLevel) {
-  // 卡片背景色 + 边框色
-  switch (level) {
-    case '大吉':
-      return {
-        bg: '#fff5d7',
-        border: '#ffb74d',
-        text: '#c75b00',
-      };
-    case '吉':
-      return {
-        bg: '#fff9e6',
-        border: '#ffc36b',
-        text: '#c47a00',
-      };
-    case '小吉':
-      return {
-        bg: '#fdf3ff',
-        border: '#e0a6ff',
-        text: '#9b4fdc',
-      };
-    case '凶':
-      return {
-        bg: '#f2f7ff',
-        border: '#90a4ff',
-        text: '#3f51b5',
-      };
-    default:
-      return {
-        bg: '#fff9f0',
-        border: '#ffcc80',
-        text: '#c47a00',
-      };
-  }
+function pickFortune(): FortuneResult {
+  const index = Math.floor(Math.random() * FORTUNES.length);
+  return FORTUNES[index];
 }
 
 export default function Home() {
-  const [fortune, setFortune] = useState<Fortune>(EMPTY_FORTUNE);
-  const [loading, setLoading] = useState(false);
+  const [fortune, setFortune] = useState<FortuneResult | null>(null);
+  const [dateLabel, setDateLabel] = useState<string>("");
+  const [loading, setLoading] = useState(true);
   const [shaking, setShaking] = useState(false);
 
-  const fetchFortune = async () => {
-    try {
-      setLoading(true);
-      setShaking(true);
+  useEffect(() => {
+    const { key, label } = getTodayKey();
+    setDateLabel(label);
 
-      // 抖动一下
-      setTimeout(() => {
-        setShaking(false);
-      }, 400);
+    if (typeof window === "undefined") return;
 
-      const res = await fetch('/api/daily-fortune');
-      const data = await res.json();
-      setFortune(data as Fortune);
-    } catch (e) {
-      console.error('Failed to fetch fortune', e);
-    } finally {
-      setLoading(false);
+    const stored = window.localStorage.getItem(key);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as FortuneResult;
+        setFortune(parsed);
+        setLoading(false);
+        return;
+      } catch {
+        // ignore parse error and regenerate
+      }
+    }
+
+    const newFortune = pickFortune();
+    window.localStorage.setItem(key, JSON.stringify(newFortune));
+    setFortune(newFortune);
+    setLoading(false);
+  }, []);
+
+  const handleShake = () => {
+    if (loading) return;
+    setShaking(true);
+    setTimeout(() => {
+      setShaking(false);
+    }, 700);
+  };
+
+  const levelFace = (level: FortuneLevel) => {
+    switch (level) {
+      case "大吉":
+        return "(๑´ڡ`๑)";
+      case "中吉":
+        return("(๑•͈ᴗ•͈)");
+      case "小吉":
+        return("( ˘ω˘ )");
+      case "吉":
+        return("(｡•̀ᴗ-)✧");
+      case "凶":
+      default:
+        return("(T﹏T)");
     }
   };
 
-  useEffect(() => {
-    // 首次进入自动抽一次
-    fetchFortune();
-  }, []);
-
-  const colors = levelColors(fortune.overall.level);
-  const displayDate = formatDate(fortune.date);
-
   return (
-    <div className="page">
-      <div className="bgGradient" />
-      <div className="center">
-        <div className="tab">おみくじ</div>
+    <>
+      <main className="omk-page">
+        {/* 漂浮装饰物 */}
+        <div className="omk-decos">
+          <span className="omk-deco omk-deco-sakura1">🌸</span>
+          <span className="omk-deco omk-deco-sakura2">🌸</span>
+          <span className="omk-deco omk-deco-bell">🎐</span>
+          <span className="omk-deco omk-deco-paw">🫧</span>
+        </div>
 
-        <div className="card">
-          <div className="cardHeader">
-            <div className="titleRow">
-              <div className="dot" />
-              <div className="title">今日おみくじ</div>
+        <div className="omk-card">
+          <div className="omk-card-inner">
+            {/* 标题行 */}
+            <div className="omk-header">
+              <div className="omk-header-dot" />
+              <div className="omk-header-title">今日おみくじ</div>
+              <div className="omk-header-date">
+                {dateLabel.replace(/-/g, "-")}
+              </div>
             </div>
-            <div className="date">{displayDate}</div>
-          </div>
 
-          <div className="subtitle">
-            <span>今日はあなたの</span>
-            <span className="highlight">専属一签</span>
-            <span>。</span>
-            <br />
-            <span>このデバイスで、今日はずっとこの一枚だけ。</span>
-          </div>
+            {/* 说明文字 */}
+            <div className="omk-subtext">
+              今日はあなたの
+              <span className="omk-highlight">専属一枚</span>。
+              <br />
+              このデバイスで、今日はずっとこの一枚だけ。
+            </div>
 
-          {/* 签卡 */}
-          <div
-            className={`omikujiWrapper ${
-              shaking ? 'omikujiWrapper--shake' : ''
-            }`}
-          >
+            {/* みくじ卡片 */}
             <div
-              className="omikujiCard"
-              style={{
-                backgroundColor: colors.bg,
-                borderColor: colors.border,
-              }}
+              className={
+                "omk-paper-wrapper" + (shaking ? " omk-paper-shake" : "")
+              }
             >
-              <div className="omikujiTop">
-                <span className="tag">おみくじ</span>
+              <div className="omk-paper-top-tag">おみくじ</div>
+              <div className="omk-paper-face">
+                {fortune ? levelFace(fortune.level) : "(・・；)"}
               </div>
-
-              <div className="face">{levelFace(fortune.overall.level)}</div>
-              <div
-                className="level"
-                style={{ color: colors.text }}
-              >
-                {fortune.overall.level || '吉'}
+              <div className="omk-paper-level">
+                {fortune ? fortune.level : "ひみつ"}
               </div>
-              <div className="smallText">今日のきっぷ</div>
-            </div>
-          </div>
-
-          {/* 信息区 */}
-          <div className="infoRow">
-            <div className="pill">
-              <div className="pillLabel">ラッキーカラー</div>
-              <div className="pillValue">
-                {fortune.luckyColor || '—'}
-              </div>
+              <div className="omk-paper-caption">今日のきっぷ</div>
             </div>
 
-            <div className="pill">
-              <div className="pillLabel">ラッキーナンバー</div>
-              <div className="pillValue">
-                {fortune.luckyNumber || '—'}
+            {/* 信息区 */}
+            <div className="omk-info-row">
+              <div className="omk-info-pill">
+                <div className="omk-info-label">ラッキーカラー</div>
+                <div className="omk-info-value">
+                  {fortune ? fortune.luckyColor : "…"}
+                </div>
+              </div>
+              <div className="omk-info-pill">
+                <div className="omk-info-label">ラッキーナンバー</div>
+                <div className="omk-info-value">
+                  {fortune ? fortune.luckyNumber : "…"}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 按钮 */}
-          <button
-            className="drawButton"
-            onClick={fetchFortune}
-            disabled={loading}
-          >
-            {loading ? 'シャカシャカ中…' : 'もう一回ひきたい！(๑•̀ㅂ•́)و✧'}
-          </button>
+            {/* 按钮 */}
+            <button
+              className="omk-button"
+              type="button"
+              onClick={handleShake}
+              disabled={loading}
+            >
+              {loading ? "ひみつ準備中…" : "もう一回ひきたい！！ (๑•̀ㅂ•́)و✧"}
+            </button>
 
-          {/* 提示文案 */}
-          <div className="tip">
-            <div>小提示：</div>
-            <div>每台设备每天一签，换一个人 / 换一台设备，</div>
-            <div>抽到的签运也许会完全不一样哦 ✨</div>
+            {/* 底部提示 */}
+            <div className="omk-footer">
+              小提示：毎台設備毎日一枚。毎天一支おみくじ。<br />
+              換一個人／換一台設備，抽到的おみくじはきっと違うかも ✨
+            </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* 样式 */}
-      <style jsx>{`
-        .page {
-          position: relative;
+      {/* 样式 & 动画 */}
+      <style jsx global>{`
+        .omk-page {
           min-height: 100vh;
+          width: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
+          padding: 32px 16px;
+          box-sizing: border-box;
+          position: relative;
           overflow: hidden;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont,
-            'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans',
-            'Yu Gothic', '微软雅黑', sans-serif;
-          background: #fdf5ff;
+          background:
+            radial-gradient(circle at 15% 0%, #ffeef4 0, #ffeef4 25%, transparent 60%),
+            radial-gradient(circle at 85% 100%, #e8f5ff 0, #e8f5ff 30%, transparent 65%),
+            radial-gradient(circle at 50% 50%, #fffaf4 0, #fffaf4 40%, #f9f7ff 100%);
+          backdrop-filter: blur(4px);
         }
 
-        .bgGradient {
+        .omk-decos {
           position: absolute;
           inset: 0;
-          background: radial-gradient(
-              circle at 20% 20%,
-              rgba(255, 204, 204, 0.9),
-              transparent 60%
-            ),
-            radial-gradient(
-              circle at 80% 30%,
-              rgba(204, 220, 255, 0.9),
-              transparent 60%
-            ),
-            radial-gradient(
-              circle at 50% 90%,
-              rgba(255, 245, 204, 0.9),
-              transparent 65%
-            );
-          animation: bgMove 25s ease-in-out infinite alternate;
-          z-index: 0;
+          pointer-events: none;
+          overflow: hidden;
         }
 
-        .center {
+        .omk-deco {
+          position: absolute;
+          font-size: 26px;
+          opacity: 0.65;
+          filter: drop-shadow(0 4px 8px rgba(255, 255, 255, 0.7));
+        }
+
+        .omk-deco-sakura1 {
+          top: 14%;
+          left: 8%;
+          animation: omk-float-soft 9s ease-in-out infinite;
+        }
+
+        .omk-deco-sakura2 {
+          bottom: 12%;
+          right: 10%;
+          animation: omk-float-soft 11s ease-in-out infinite;
+        }
+
+        .omk-deco-bell {
+          top: 10%;
+          right: 22%;
+          animation: omk-sway 7s ease-in-out infinite;
+        }
+
+        .omk-deco-paw {
+          bottom: 18%;
+          left: 20%;
+          animation: omk-bubble 13s linear infinite;
+        }
+
+        .omk-card {
           position: relative;
+          max-width: 480px;
+          width: 100%;
           z-index: 1;
+        }
+
+        .omk-card-inner {
+          background: radial-gradient(circle at 0% 0%, #fffaf8 0, #ffffff 30%, #fdf9ff 100%);
+          border-radius: 28px;
+          padding: 28px 26px 26px;
+          box-shadow:
+            0 18px 45px rgba(234, 160, 175, 0.18),
+            0 0 0 1px rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(10px);
+        }
+
+        .omk-header {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          gap: 16px;
-        }
-
-        .tab {
-          padding: 10px 36px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, #e53935, #ff7043);
-          color: #fff;
-          font-size: 16px;
-          letter-spacing: 0.12em;
-          box-shadow: 0 8px 20px rgba(244, 81, 30, 0.4);
-        }
-
-        .card {
-          width: 420px;
-          max-width: 90vw;
-          border-radius: 32px;
-          background: rgba(255, 255, 255, 0.96);
-          box-shadow: 0 20px 60px rgba(255, 152, 120, 0.26);
-          padding: 28px 28px 26px;
-          backdrop-filter: blur(16px);
-        }
-
-        .cardHeader {
-          display: flex;
           justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        .titleRow {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #ff8a80, #ff5252);
-          box-shadow: 0 0 8px rgba(255, 82, 82, 0.6);
-        }
-
-        .title {
-          font-size: 18px;
-          font-weight: 600;
-          color: #444;
-        }
-
-        .date {
-          font-size: 13px;
-          color: #999;
-        }
-
-        .subtitle {
-          font-size: 13px;
-          color: #777;
-          line-height: 1.6;
-          margin-bottom: 18px;
-        }
-
-        .highlight {
-          color: #ff5c7a;
-          font-weight: 600;
-        }
-
-        .omikujiWrapper {
-          display: flex;
-          justify-content: center;
           margin-bottom: 20px;
         }
 
-        .omikujiCard {
-          width: 180px;
-          height: 240px;
+        .omk-header-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: radial-gradient(circle, #ff6272 0, #ff3c4f 80%);
+          box-shadow: 0 0 0 4px rgba(255, 99, 132, 0.2);
+          margin-right: 8px;
+        }
+
+        .omk-header-title {
+          flex: 1;
+          font-size: 18px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          color: #333;
+        }
+
+        .omk-header-date {
+          font-size: 12px;
+          color: #b3b0c1;
+          letter-spacing: 0.06em;
+        }
+
+        .omk-subtext {
+          font-size: 13px;
+          line-height: 1.7;
+          color: #6f6b7a;
+          margin-bottom: 22px;
+        }
+
+        .omk-highlight {
+          color: #ff4b6a;
+          font-weight: 600;
+        }
+
+        .omk-paper-wrapper {
+          position: relative;
+          margin: 0 auto 22px;
+          width: 220px;
+          max-width: 100%;
+          aspect-ratio: 3 / 4;
+          background: linear-gradient(180deg, #f8f5ff 0%, #ffffff 40%, #fef7ff 100%);
           border-radius: 24px;
-          border: 2px solid;
-          box-shadow: 0 16px 30px rgba(158, 158, 158, 0.22);
+          border: 1px solid rgba(168, 174, 255, 0.3);
+          box-shadow:
+            0 14px 30px rgba(154, 133, 255, 0.18),
+            0 0 0 1px rgba(255, 255, 255, 0.9);
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: flex-start;
-          padding-top: 22px;
-          animation: float 3s ease-in-out infinite;
-        }
-
-        .omikujiTop {
-          display: flex;
           justify-content: center;
-          margin-bottom: 10px;
+          box-sizing: border-box;
         }
 
-        .tag {
-          padding: 4px 12px;
+        .omk-paper-top-tag {
+          position: absolute;
+          top: 12px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 4px 16px;
           border-radius: 999px;
-          font-size: 11px;
-          color: #ff7043;
-          background: rgba(255, 224, 187, 0.7);
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          color: #ff7f6b;
+          background: linear-gradient(135deg, #ffe0d5, #ffd0ce);
+          box-shadow: 0 6px 18px rgba(255, 169, 140, 0.45);
         }
 
-        .face {
-          font-size: 14px;
-          color: #999;
+        .omk-paper-face {
+          margin-bottom: 8px;
+          font-size: 22px;
+          color: #9d8ce0;
+        }
+
+        .omk-paper-level {
+          font-size: 50px;
+          letter-spacing: 0.18em;
+          text-indent: 0.18em;
+          color: #4f64d8;
+          text-shadow: 0 6px 15px rgba(79, 100, 216, 0.35);
           margin-bottom: 6px;
         }
 
-        .level {
-          font-size: 56px;
-          font-weight: 700;
-          margin-bottom: 4px;
-        }
-
-        .smallText {
+        .omk-paper-caption {
           font-size: 11px;
-          color: #999;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
+          letter-spacing: 0.22em;
+          color: #9a96b8;
         }
 
-        .infoRow {
+        .omk-info-row {
           display: flex;
           gap: 12px;
-          margin-bottom: 18px;
+          margin-bottom: 20px;
         }
 
-        .pill {
+        .omk-info-pill {
           flex: 1;
-          padding: 12px 14px;
-          border-radius: 999px;
-          background: #fafafa;
-          border: 1px solid #f1e5ff;
+          padding: 10px 14px;
+          border-radius: 16px;
+          background: linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.92),
+            rgba(250, 244, 255, 0.95)
+          );
+          box-shadow: 0 6px 18px rgba(210, 187, 255, 0.18);
+          border: 1px solid rgba(230, 222, 255, 0.8);
         }
 
-        .pillLabel {
+        .omk-info-label {
           font-size: 11px;
-          color: #999;
-          margin-bottom: 4px;
+          color: #a59fc3;
+          margin-bottom: 2px;
+          letter-spacing: 0.08em;
         }
 
-        .pillValue {
-          font-size: 14px;
-          font-weight: 500;
-          color: #555;
+        .omk-info-value {
+          font-size: 13px;
+          color: #433c68;
+          font-weight: 600;
         }
 
-        .drawButton {
+        .omk-button {
           width: 100%;
-          margin: 4px 0 10px;
-          padding: 12px 16px;
+          margin-bottom: 16px;
+          padding: 12px 18px;
           border-radius: 999px;
           border: none;
-          outline: none;
           cursor: pointer;
           font-size: 14px;
           font-weight: 600;
+          letter-spacing: 0.08em;
           color: #fff;
-          background: linear-gradient(120deg, #ff5f6d, #ff8e53);
-          box-shadow: 0 12px 25px rgba(255, 111, 97, 0.4);
-          transition: transform 0.15s ease, box-shadow 0.15s ease,
-            opacity 0.15s ease;
+          background: linear-gradient(90deg, #ff6b6b, #ff884d);
+          box-shadow:
+            0 14px 30px rgba(255, 120, 84, 0.45),
+            0 0 0 1px rgba(255, 255, 255, 0.7);
+          transform: translateY(0);
+          transition:
+            box-shadow 0.15s ease-out,
+            transform 0.15s ease-out,
+            filter 0.15s ease-out;
         }
 
-        .drawButton:hover:not(:disabled) {
-          transform: translateY(-1px) scale(1.01);
-          box-shadow: 0 16px 30px rgba(255, 111, 97, 0.46);
+        .omk-button:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow:
+            0 18px 34px rgba(255, 120, 84, 0.6),
+            0 0 0 1px rgba(255, 255, 255, 0.8);
+          filter: brightness(1.03);
         }
 
-        .drawButton:active:not(:disabled) {
-          transform: scale(0.96);
-          box-shadow: 0 8px 18px rgba(255, 111, 97, 0.36);
-        }
-
-        .drawButton:disabled {
-          opacity: 0.75;
+        .omk-button:disabled {
+          opacity: 0.7;
           cursor: default;
         }
 
-        .tip {
+        .omk-footer {
           text-align: center;
           font-size: 11px;
-          color: #aaa;
-          line-height: 1.5;
+          line-height: 1.7;
+          color: #b3afc5;
         }
 
-        @keyframes bgMove {
+        .omk-paper-shake {
+          animation: omk-shake 0.7s ease-in-out;
+        }
+
+        @keyframes omk-shake {
           0% {
-            transform: translate3d(0, 0, 0);
+            transform: translateY(0) rotate(0deg);
+          }
+          20% {
+            transform: translateY(-6px) rotate(-2deg);
+          }
+          40% {
+            transform: translateY(4px) rotate(2deg);
+          }
+          60% {
+            transform: translateY(-3px) rotate(-1deg);
+          }
+          80% {
+            transform: translateY(2px) rotate(1deg);
           }
           100% {
-            transform: translate3d(-3%, 3%, 0);
+            transform: translateY(0) rotate(0deg);
           }
         }
 
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0);
+        @keyframes omk-float-soft {
+          0% {
+            transform: translateY(0) translateX(0) rotate(0deg);
           }
           50% {
-            transform: translateY(-4px);
+            transform: translateY(-10px) translateX(6px) rotate(4deg);
+          }
+          100% {
+            transform: translateY(0) translateX(0) rotate(0deg);
           }
         }
 
-        @keyframes shake {
+        @keyframes omk-sway {
           0% {
-            transform: translateX(0);
+            transform: translateY(0) rotate(0deg);
           }
           25% {
-            transform: translateX(-4px);
+            transform: translateY(4px) rotate(6deg);
           }
           50% {
-            transform: translateX(4px);
+            transform: translateY(0) rotate(-4deg);
           }
           75% {
-            transform: translateX(-3px);
+            transform: translateY(4px) rotate(3deg);
           }
           100% {
-            transform: translateX(0);
+            transform: translateY(0) rotate(0deg);
           }
         }
 
-        .omikujiWrapper--shake .omikujiCard {
-          animation: shake 0.35s ease;
+        @keyframes omk-bubble {
+          0% {
+            transform: translateY(12px) scale(0.9);
+            opacity: 0;
+          }
+          20% {
+            opacity: 0.7;
+          }
+          80% {
+            opacity: 0.7;
+          }
+          100% {
+            transform: translateY(-22px) scale(1.05);
+            opacity: 0;
+          }
         }
 
-        @media (max-width: 480px) {
-          .card {
-            width: 340px;
+        @media (max-width: 600px) {
+          .omk-card-inner {
             padding: 22px 18px 22px;
           }
-
-          .omikujiCard {
-            width: 160px;
-            height: 220px;
-          }
-
-          .infoRow {
-            flex-direction: column;
+          .omk-paper-wrapper {
+            width: 200px;
           }
         }
       `}</style>
-    </div>
+    </>
   );
 }
