@@ -24,6 +24,107 @@ type Fortune = {
   luckyNumber: number;
 };
 
+type FortuneTemplate = Omit<Fortune, "date" | "name">;
+
+// 签池：可以以后慢慢加
+const FORTUNE_TEMPLATES: FortuneTemplate[] = [
+  {
+    overall: {
+      level: "大吉",
+      score: 5,
+      text: "今天万事向好，适合大胆一点，为自己争取机会。",
+    },
+    career: {
+      level: "大吉",
+      score: 5,
+      text: "适合提出新想法、发邮件跟进、推进重要事项。",
+    },
+    love: {
+      level: "中吉",
+      score: 4,
+      text: "温柔表达感受，会被好好接住的一天。",
+    },
+    luckyColor: "樱花粉",
+    luckyNumber: 3,
+  },
+  {
+    overall: {
+      level: "中吉",
+      score: 4,
+      text: "节奏比较顺滑，适合稳稳推进计划中的事情。",
+    },
+    career: {
+      level: "中吉",
+      score: 4,
+      text: "适合整理、复盘、补完之前没做完的部分。",
+    },
+    love: {
+      level: "大吉",
+      score: 5,
+      text: "适合约见、聊天、拉近距离的一天。",
+    },
+    luckyColor: "淡蓝色",
+    luckyNumber: 7,
+  },
+  {
+    overall: {
+      level: "小吉",
+      score: 3,
+      text: "小确幸的一天，把注意力放在微小的开心上。",
+    },
+    career: {
+      level: "小吉",
+      score: 3,
+      text: "适合做不太费脑子的执行任务，别给自己太大压力。",
+    },
+    love: {
+      level: "吉",
+      score: 3,
+      text: "适合轻松的互动，不要太用力，自然一点就好。",
+    },
+    luckyColor: "薄荷绿",
+    luckyNumber: 9,
+  },
+  {
+    overall: {
+      level: "吉",
+      score: 3,
+      text: "整体平稳，保持心情舒展就很不错。",
+    },
+    career: {
+      level: "吉",
+      score: 3,
+      text: "适合慢慢打基础、学习新东西。",
+    },
+    love: {
+      level: "吉",
+      score: 3,
+      text: "适合好好陪自己、也可以和朋友多聊聊天。",
+    },
+    luckyColor: "奶油黄",
+    luckyNumber: 1,
+  },
+  {
+    overall: {
+      level: "凶",
+      score: 2,
+      text: "可能比较容易在意别人的眼光，多对自己温柔一点。",
+    },
+    career: {
+      level: "小吉",
+      score: 3,
+      text: "不适合硬刚，适合先观察、再行动。",
+    },
+    love: {
+      level: "凶",
+      score: 2,
+      text: "别急着下结论，更适合安静照顾自己的情绪。",
+    },
+    luckyColor: "雾霾蓝",
+    luckyNumber: 4,
+  },
+];
+
 function getLevelTheme(level: string) {
   // 日系神社 + Q 版配色
   switch (level) {
@@ -51,6 +152,14 @@ function getLevelTheme(level: string) {
         ribbon: "#22c55e",
         face: "(๑•̀ㅂ•́)و✧",
       };
+    case "吉":
+      return {
+        omikujiBg: "#fefce8",
+        omikujiBorder: "#eab308",
+        omikujiText: "#854d0e",
+        ribbon: "#facc15",
+        face: "(•ᴗ•)و",
+      };
     case "凶":
       return {
         omikujiBg: "#fef2f2",
@@ -70,21 +179,60 @@ function getLevelTheme(level: string) {
   }
 }
 
+function getTodayString() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function generateFortuneForToday(): Fortune {
+  const today = getTodayString();
+  const storageKey = `daily-fortune-v1-${today}`;
+
+  if (typeof window !== "undefined") {
+    const saved = window.localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Fortune;
+      } catch {
+        // 解析失败就重新生成
+      }
+    }
+  }
+
+  const template =
+    FORTUNE_TEMPLATES[
+      Math.floor(Math.random() * FORTUNE_TEMPLATES.length)
+    ];
+
+  const fortune: Fortune = {
+    date: today,
+    name: "你",
+    ...template,
+  };
+
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(storageKey, JSON.stringify(fortune));
+  }
+
+  return fortune;
+}
+
 export default function Home() {
   const [fortune, setFortune] = useState<Fortune | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function fetchFortune() {
+  function fetchFortune() {
     setLoading(true);
-    try {
-      const res = await fetch("/api/daily-fortune");
-      const data = (await res.json()) as Fortune;
-      setFortune(data);
-    } catch (e) {
-      console.error("Failed to fetch fortune", e);
-    } finally {
+
+    // 模拟摇签时间，看起来更有仪式感一点
+    setTimeout(() => {
+      const ft = generateFortuneForToday();
+      setFortune(ft);
       setLoading(false);
-    }
+    }, 500);
   }
 
   useEffect(() => {
@@ -146,7 +294,6 @@ export default function Home() {
             pointerEvents: "none",
           }}
         >
-          {/* 简化小鸟居 */}
           <div
             style={{
               width: 120,
@@ -165,7 +312,6 @@ export default function Home() {
           >
             おみくじ
           </div>
-          {/* 垂下的小绳子 */}
           <div
             style={{
               width: 2,
@@ -190,7 +336,6 @@ export default function Home() {
             backdropFilter: "blur(14px)",
           }}
         >
-          {/* 顶部说明 */}
           <div
             style={{
               display: "flex",
@@ -209,12 +354,9 @@ export default function Home() {
             >
               今日抽签
             </div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>
-              {date || "加载中…"}
-            </div>
+            <div style={{ fontSize: 11, color: "#9ca3af" }}>{date}</div>
           </div>
 
-          {/* Q 版小脸 + 提示 */}
           <div
             style={{
               display: "flex",
@@ -241,7 +383,7 @@ export default function Home() {
             <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
               今天是你的<span style={{ color: "#ef4444" }}> 专属一签</span>。
               <br />
-              同一天不管抽多少次，都是这支签哦。
+              同一天你在这台设备上，不管抽多少次，都是这支签噢。
             </div>
           </div>
 
@@ -269,7 +411,6 @@ export default function Home() {
                 overflow: "hidden",
               }}
             >
-              {/* 小红绳结 */}
               <div
                 style={{
                   position: "absolute",
@@ -282,7 +423,6 @@ export default function Home() {
                     "radial-gradient(circle at 30% 10%, #fecaca 0, #fee2e2 40%, #ffffff 95%)",
                 }}
               />
-              {/* Q 版表情 */}
               <div
                 style={{
                   marginTop: 12,
@@ -294,7 +434,6 @@ export default function Home() {
               >
                 {theme.face}
               </div>
-              {/* 大字：凶吉 */}
               <div
                 style={{
                   fontSize: 40,
@@ -308,7 +447,6 @@ export default function Home() {
               >
                 {bigLevel}
               </div>
-              {/* 小注释 */}
               <div
                 style={{
                   fontSize: 10,
@@ -325,7 +463,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 幸运信息 */}
           {fortune && (
             <div
               style={{
@@ -372,7 +509,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* 按钮 */}
           <button
             onClick={fetchFortune}
             disabled={loading}
@@ -408,9 +544,9 @@ export default function Home() {
               lineHeight: 1.5,
             }}
           >
-            小提示：结果是按日期生成的日签，
+            小提示：每台设备、每天一支签。
             <br />
-            不能刷出别的签，只能刷出同一支「今天的你」。
+            换一个人 / 换一台设备，抽到的很可能就不一样啦。
           </div>
         </div>
       </div>
