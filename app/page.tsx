@@ -1,22 +1,24 @@
-"use client";
+'use client';
 
-import { useEffect, useState, MouseEvent, useRef } from "react";
+import React, { useEffect, useState } from 'react';
+
+type FortuneLevel = '大吉' | '吉' | '小吉' | '凶' | string;
 
 type Fortune = {
   date: string;
   name: string;
   overall: {
-    level: string;
+    level: FortuneLevel;
     score: number;
     text: string;
   };
   career: {
-    level: string;
+    level: FortuneLevel;
     score: number;
     text: string;
   };
   love: {
-    level: string;
+    level: FortuneLevel;
     score: number;
     text: string;
   };
@@ -24,623 +26,492 @@ type Fortune = {
   luckyNumber: number;
 };
 
-type FortuneTemplate = Omit<Fortune, "date" | "name">;
+const EMPTY_FORTUNE: Fortune = {
+  date: '',
+  name: 'あなた',
+  overall: {
+    level: '吉',
+    score: 3,
+    text: '',
+  },
+  career: {
+    level: '吉',
+    score: 3,
+    text: '',
+  },
+  love: {
+    level: '吉',
+    score: 3,
+    text: '',
+  },
+  luckyColor: '',
+  luckyNumber: 0,
+};
 
-// 签池：可以以后慢慢加
-const FORTUNE_TEMPLATES: FortuneTemplate[] = [
-  {
-    overall: {
-      level: "大吉",
-      score: 5,
-      text: "今天万事向好，适合大胆一点，为自己争取机会。",
-    },
-    career: {
-      level: "大吉",
-      score: 5,
-      text: "适合提出新想法、发邮件跟进、推进重要事项。",
-    },
-    love: {
-      level: "中吉",
-      score: 4,
-      text: "温柔表达感受，会被好好接住的一天。",
-    },
-    luckyColor: "樱花粉",
-    luckyNumber: 3,
-  },
-  {
-    overall: {
-      level: "中吉",
-      score: 4,
-      text: "节奏比较顺滑，适合稳稳推进计划中的事情。",
-    },
-    career: {
-      level: "中吉",
-      score: 4,
-      text: "适合整理、复盘、补完之前没做完的部分。",
-    },
-    love: {
-      level: "大吉",
-      score: 5,
-      text: "适合约见、聊天、拉近距离的一天。",
-    },
-    luckyColor: "淡蓝色",
-    luckyNumber: 7,
-  },
-  {
-    overall: {
-      level: "小吉",
-      score: 3,
-      text: "小确幸的一天，把注意力放在微小的开心上。",
-    },
-    career: {
-      level: "小吉",
-      score: 3,
-      text: "适合做不太费脑子的执行任务，别给自己太大压力。",
-    },
-    love: {
-      level: "吉",
-      score: 3,
-      text: "适合轻松的互动，不要太用力，自然一点就好。",
-    },
-    luckyColor: "薄荷绿",
-    luckyNumber: 9,
-  },
-  {
-    overall: {
-      level: "吉",
-      score: 3,
-      text: "整体平稳，保持心情舒展就很不错。",
-    },
-    career: {
-      level: "吉",
-      score: 3,
-      text: "适合慢慢打基础、学习新东西。",
-    },
-    love: {
-      level: "吉",
-      score: 3,
-      text: "适合好好陪自己、也可以和朋友多聊聊天。",
-    },
-    luckyColor: "奶油黄",
-    luckyNumber: 1,
-  },
-  {
-    overall: {
-      level: "凶",
-      score: 2,
-      text: "可能比较容易在意别人的眼光，多对自己温柔一点。",
-    },
-    career: {
-      level: "小吉",
-      score: 3,
-      text: "不适合硬刚，适合先观察、再行动。",
-    },
-    love: {
-      level: "凶",
-      score: 2,
-      text: "别急着下结论，更适合安静照顾自己的情绪。",
-    },
-    luckyColor: "雾霾蓝",
-    luckyNumber: 4,
-  },
-];
-
-function getLevelTheme(level: string) {
-  // 日系神社 + Q 版配色
-  switch (level) {
-    case "大吉":
-      return {
-        omikujiBg: "#fff7eb",
-        omikujiBorder: "#f97316",
-        omikujiText: "#b45309",
-        ribbon: "#f97316",
-        face: "٩(ˊᗜˋ*)و",
-      };
-    case "中吉":
-      return {
-        omikujiBg: "#eef2ff",
-        omikujiBorder: "#4f46e5",
-        omikujiText: "#3730a3",
-        ribbon: "#6366f1",
-        face: "(｡•̀ᴗ-)✧",
-      };
-    case "小吉":
-      return {
-        omikujiBg: "#ecfdf5",
-        omikujiBorder: "#22c55e",
-        omikujiText: "#15803d",
-        ribbon: "#22c55e",
-        face: "(๑•̀ㅂ•́)و✧",
-      };
-    case "吉":
-      return {
-        omikujiBg: "#fefce8",
-        omikujiBorder: "#eab308",
-        omikujiText: "#854d0e",
-        ribbon: "#facc15",
-        face: "(•ᴗ•)و",
-      };
-    case "凶":
-      return {
-        omikujiBg: "#fef2f2",
-        omikujiBorder: "#ef4444",
-        omikujiText: "#b91c1c",
-        ribbon: "#ef4444",
-        face: "(；´д｀)ゞ",
-      };
-    default:
-      return {
-        omikujiBg: "#f9fafb",
-        omikujiBorder: "#cbd5f5",
-        omikujiText: "#111827",
-        ribbon: "#f97316",
-        face: "(•ᴗ•)و",
-      };
-  }
-}
-
-function getTodayString() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
+function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// 生成 / 读取「每台设备每天一签」
-function generateFortuneForToday(): Fortune {
-  const today = getTodayString();
-  const storageKey = `daily-fortune-v1-${today}`;
-
-  if (typeof window !== "undefined") {
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        return JSON.parse(saved) as Fortune;
-      } catch {
-        // 解析失败就重新生成
-      }
-    }
+function levelFace(level: FortuneLevel) {
+  switch (level) {
+    case '大吉':
+      return 'ヽ(✿ﾟ▽ﾟ)ノ';
+    case '吉':
+      return '(*´∀`)♪';
+    case '小吉':
+      return '(◍•ᴗ•◍)';
+    case '凶':
+      return '(╥﹏╥)';
+    default:
+      return '(・ω・)';
   }
+}
 
-  const template =
-    FORTUNE_TEMPLATES[
-      Math.floor(Math.random() * FORTUNE_TEMPLATES.length)
-    ];
-
-  const fortune: Fortune = {
-    date: today,
-    name: "你",
-    ...template,
-  };
-
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(storageKey, JSON.stringify(fortune));
+function levelColors(level: FortuneLevel) {
+  // 卡片背景色 + 边框色
+  switch (level) {
+    case '大吉':
+      return {
+        bg: '#fff5d7',
+        border: '#ffb74d',
+        text: '#c75b00',
+      };
+    case '吉':
+      return {
+        bg: '#fff9e6',
+        border: '#ffc36b',
+        text: '#c47a00',
+      };
+    case '小吉':
+      return {
+        bg: '#fdf3ff',
+        border: '#e0a6ff',
+        text: '#9b4fdc',
+      };
+    case '凶':
+      return {
+        bg: '#f2f7ff',
+        border: '#90a4ff',
+        text: '#3f51b5',
+      };
+    default:
+      return {
+        bg: '#fff9f0',
+        border: '#ffcc80',
+        text: '#c47a00',
+      };
   }
-
-  return fortune;
 }
 
 export default function Home() {
-  const [fortune, setFortune] = useState<Fortune | null>(null);
+  const [fortune, setFortune] = useState<Fortune>(EMPTY_FORTUNE);
   const [loading, setLoading] = useState(false);
-  const [isShaking, setIsShaking] = useState(false);
+  const [shaking, setShaking] = useState(false);
 
-  // 音效：摇签 + 抽到签
-  const shakeSoundRef = useRef<HTMLAudioElement | null>(null);
-  const resultSoundRef = useRef<HTMLAudioElement | null>(null);
+  const fetchFortune = async () => {
+    try {
+      setLoading(true);
+      setShaking(true);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // 这里的路径是 /public/sounds/ 里的文件
-      shakeSoundRef.current = new Audio("/sounds/shake.mp3");
-      resultSoundRef.current = new Audio("/sounds/result.mp3");
-    }
-  }, []);
+      // 抖动一下
+      setTimeout(() => {
+        setShaking(false);
+      }, 400);
 
-  function doFetchFortune(withEffects: boolean) {
-    setLoading(true);
-
-    if (withEffects && shakeSoundRef.current) {
-      try {
-        shakeSoundRef.current.currentTime = 0;
-        shakeSoundRef.current.play();
-      } catch {
-        // 静默失败即可
-      }
-    }
-
-    if (withEffects) {
-      setIsShaking(true);
-    }
-
-    // 模拟摇签时间，看起来更有仪式感一点
-    setTimeout(() => {
-      const ft = generateFortuneForToday();
-      setFortune(ft);
+      const res = await fetch('/api/daily-fortune');
+      const data = await res.json();
+      setFortune(data as Fortune);
+    } catch (e) {
+      console.error('Failed to fetch fortune', e);
+    } finally {
       setLoading(false);
-      setIsShaking(false);
+    }
+  };
 
-      if (withEffects && resultSoundRef.current) {
-        try {
-          resultSoundRef.current.currentTime = 0;
-          resultSoundRef.current.play();
-        } catch {
-          // 静默失败
-        }
-      }
-    }, 600);
-  }
-
-  // 首次加载：只生成签，不播声音、不摇动
   useEffect(() => {
-    doFetchFortune(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 首次进入自动抽一次
+    fetchFortune();
   }, []);
 
-  const bigLevel = fortune?.overall.level ?? "—";
-  const date = fortune?.date ?? "";
-  const luckyColor = fortune?.luckyColor ?? "";
-  const luckyNumber = fortune?.luckyNumber ?? "";
-  const theme = getLevelTheme(bigLevel);
-
-  const handleMouseDown = (e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.transform = "translateY(1px)";
-    e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.25)";
-  };
-
-  const handleMouseUp = (e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.transform = "translateY(0)";
-    e.currentTarget.style.boxShadow = "0 10px 28px rgba(15, 23, 42, 0.4)";
-  };
-
-  const handleMouseLeave = (e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.transform = "translateY(0)";
-    e.currentTarget.style.boxShadow = "0 10px 28px rgba(15, 23, 42, 0.4)";
-  };
+  const colors = levelColors(fortune.overall.level);
+  const displayDate = formatDate(fortune.date);
 
   return (
-    <>
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "24px",
-          background:
-            "radial-gradient(circle at 0% 0%, #fee2e2 0, transparent 45%), radial-gradient(circle at 100% 0%, #e0f2fe 0, transparent 45%), radial-gradient(circle at 50% 100%, #fef9c3 0, #f9fafb 55%)",
-          fontFamily:
-            'system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            width: "360px",
-            maxWidth: "100%",
-          }}
-        >
-          {/* 顶部小鸟居 + 绳结 */}
-          <div
-            style={{
-              position: "absolute",
-              top: -32,
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              pointerEvents: "none",
-            }}
-          >
-            <div
-              style={{
-                width: 120,
-                height: 32,
-                borderRadius: "999px",
-                background:
-                  "linear-gradient(to right, #b91c1c, #dc2626, #b91c1c)",
-                boxShadow: "0 4px 10px rgba(185, 28, 28, 0.45)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fef2f2",
-                fontSize: 12,
-                letterSpacing: "0.2em",
-              }}
-            >
-              おみくじ
+    <div className="page">
+      <div className="bgGradient" />
+      <div className="center">
+        <div className="tab">おみくじ</div>
+
+        <div className="card">
+          <div className="cardHeader">
+            <div className="titleRow">
+              <div className="dot" />
+              <div className="title">今日おみくじ</div>
             </div>
-            <div
-              style={{
-                width: 2,
-                height: 22,
-                background: theme.ribbon,
-                marginTop: 2,
-                borderRadius: 999,
-              }}
-            />
+            <div className="date">{displayDate}</div>
           </div>
 
-          {/* 主容器 */}
+          <div className="subtitle">
+            <span>今日はあなたの</span>
+            <span className="highlight">専属一签</span>
+            <span>。</span>
+            <br />
+            <span>このデバイスで、今日はずっとこの一枚だけ。</span>
+          </div>
+
+          {/* 签卡 */}
           <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              background: "rgba(255, 255, 255, 0.96)",
-              borderRadius: 24,
-              padding: "30px 22px 18px",
-              boxShadow:
-                "0 20px 50px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(148, 163, 184, 0.25)",
-              backdropFilter: "blur(14px)",
-            }}
+            className={`omikujiWrapper ${
+              shaking ? 'omikujiWrapper--shake' : ''
+            }`}
           >
             <div
+              className="omikujiCard"
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 14,
-                alignItems: "baseline",
+                backgroundColor: colors.bg,
+                borderColor: colors.border,
               }}
             >
-              <div
-                style={{
-                  fontSize: 13,
-                  color: "#6b7280",
-                  letterSpacing: "0.16em",
-                  textTransform: "uppercase",
-                }}
-              >
-                今日抽签
+              <div className="omikujiTop">
+                <span className="tag">おみくじ</span>
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>{date}</div>
-            </div>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 14,
-              }}
-            >
+              <div className="face">{levelFace(fortune.overall.level)}</div>
               <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  background:
-                    "radial-gradient(circle at 30% 20%, #fee2e2 0, #fecaca 20%, #f9fafb 65%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 18,
-                }}
+                className="level"
+                style={{ color: colors.text }}
               >
-                🌸
+                {fortune.overall.level || '吉'}
               </div>
-              <div
-                style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}
-              >
-                今天是你的<span style={{ color: "#ef4444" }}> 专属一签</span>。
-                <br />
-                同一天你在这台设备上，不管抽多少次，都是这支签噢。
+              <div className="smallText">今日のきっぷ</div>
+            </div>
+          </div>
+
+          {/* 信息区 */}
+          <div className="infoRow">
+            <div className="pill">
+              <div className="pillLabel">ラッキーカラー</div>
+              <div className="pillValue">
+                {fortune.luckyColor || '—'}
               </div>
             </div>
 
-            {/* 竖版和风小签纸 */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: 16,
-              }}
-            >
-              <div
-                className="omikuji-card"
-                style={{
-                  width: 140,
-                  borderRadius: 16,
-                  border: `2px solid ${theme.omikujiBorder}`,
-                  background: theme.omikujiBg,
-                  boxShadow:
-                    "0 10px 24px rgba(148, 163, 184, 0.35), 0 0 0 1px rgba(248, 250, 252, 0.9) inset",
-                  padding: "14px 10px 10px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  position: "relative",
-                  overflow: "hidden",
-                  animation: isShaking
-                    ? "omikujiShake 0.4s ease-in-out infinite"
-                    : "omikujiFloat 4s ease-in-out infinite",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    width: 34,
-                    height: 10,
-                    borderRadius: 999,
-                    border: `1px solid ${theme.ribbon}`,
-                    background:
-                      "radial-gradient(circle at 30% 10%, #fecaca 0, #fee2e2 40%, #ffffff 95%)",
-                  }}
-                />
-                <div
-                  style={{
-                    marginTop: 12,
-                    fontSize: 11,
-                    color: "#9ca3af",
-                    textAlign: "center",
-                    marginBottom: 4,
-                  }}
-                >
-                  {theme.face}
-                </div>
-                <div
-                  style={{
-                    fontSize: 40,
-                    fontWeight: 800,
-                    letterSpacing: "0.32em",
-                    color: theme.omikujiText,
-                    writingMode: "vertical-rl" as any,
-                    textOrientation: "upright" as any,
-                    margin: "4px 0",
-                  }}
-                >
-                  {bigLevel}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "#6b7280",
-                    marginTop: 4,
-                    textAlign: "center",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  おみくじ
-                  <br />
-                  今日のきっぷ
-                </div>
+            <div className="pill">
+              <div className="pillLabel">ラッキーナンバー</div>
+              <div className="pillValue">
+                {fortune.luckyNumber || '—'}
               </div>
             </div>
+          </div>
 
-            {fortune && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  fontSize: 12,
-                  color: "#6b7280",
-                  marginBottom: 12,
-                }}
-              >
-                <div
-                  style={{
-                    flex: 1,
-                    padding: "8px 10px",
-                    borderRadius: 14,
-                    background: "rgba(248, 250, 252, 0.98)",
-                    border: "1px solid rgba(226, 232, 240, 0.9)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#9ca3af",
-                      marginBottom: 2,
-                    }}
-                  >
-                    幸运颜色
-                  </div>
-                  <div>{luckyColor}</div>
-                </div>
-                <div
-                  style={{
-                    flex: 1,
-                    padding: "8px 10px",
-                    borderRadius: 14,
-                    background: "rgba(248, 250, 252, 0.98)",
-                    border: "1px solid rgba(226, 232, 240, 0.9)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#9ca3af",
-                      marginBottom: 2,
-                    }}
-                  >
-                    幸运数字
-                  </div>
-                  <div>{luckyNumber}</div>
-                </div>
-              </div>
-            )}
+          {/* 按钮 */}
+          <button
+            className="drawButton"
+            onClick={fetchFortune}
+            disabled={loading}
+          >
+            {loading ? 'シャカシャカ中…' : 'もう一回ひきたい！(๑•̀ㅂ•́)و✧'}
+          </button>
 
-            <button
-              onClick={() => doFetchFortune(true)}
-              disabled={loading}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              style={{
-                width: "100%",
-                padding: "10px 0",
-                borderRadius: 999,
-                border: "none",
-                background:
-                  "linear-gradient(to right, #b91c1c, #ef4444, #f97316)",
-                color: "#fef2f2",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: loading ? "default" : "pointer",
-                opacity: loading ? 0.8 : 1,
-                boxShadow: "0 10px 28px rgba(127, 29, 29, 0.45)",
-                transition:
-                  "transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease",
-              }}
-            >
-              {loading ? "摇签中…" : "再摇一次签筒"}
-            </button>
-
-            <div
-              style={{
-                marginTop: 8,
-                fontSize: 10,
-                color: "#9ca3af",
-                textAlign: "center",
-                lineHeight: 1.5,
-              }}
-            >
-              小提示：每台设备、每天一支签。
-              <br />
-              换一个人 / 换一台设备，抽到的很可能就不一样啦。
-            </div>
+          {/* 提示文案 */}
+          <div className="tip">
+            <div>小提示：</div>
+            <div>每台设备每天一签，换一个人 / 换一台设备，</div>
+            <div>抽到的签运也许会完全不一样哦 ✨</div>
           </div>
         </div>
       </div>
 
-      {/* 全局动效 keyframes */}
-      <style jsx global>{`
-        @keyframes omikujiFloat {
+      {/* 样式 */}
+      <style jsx>{`
+        .page {
+          position: relative;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont,
+            'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans',
+            'Yu Gothic', '微软雅黑', sans-serif;
+          background: #fdf5ff;
+        }
+
+        .bgGradient {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              circle at 20% 20%,
+              rgba(255, 204, 204, 0.9),
+              transparent 60%
+            ),
+            radial-gradient(
+              circle at 80% 30%,
+              rgba(204, 220, 255, 0.9),
+              transparent 60%
+            ),
+            radial-gradient(
+              circle at 50% 90%,
+              rgba(255, 245, 204, 0.9),
+              transparent 65%
+            );
+          animation: bgMove 25s ease-in-out infinite alternate;
+          z-index: 0;
+        }
+
+        .center {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .tab {
+          padding: 10px 36px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #e53935, #ff7043);
+          color: #fff;
+          font-size: 16px;
+          letter-spacing: 0.12em;
+          box-shadow: 0 8px 20px rgba(244, 81, 30, 0.4);
+        }
+
+        .card {
+          width: 420px;
+          max-width: 90vw;
+          border-radius: 32px;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 20px 60px rgba(255, 152, 120, 0.26);
+          padding: 28px 28px 26px;
+          backdrop-filter: blur(16px);
+        }
+
+        .cardHeader {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .titleRow {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #ff8a80, #ff5252);
+          box-shadow: 0 0 8px rgba(255, 82, 82, 0.6);
+        }
+
+        .title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #444;
+        }
+
+        .date {
+          font-size: 13px;
+          color: #999;
+        }
+
+        .subtitle {
+          font-size: 13px;
+          color: #777;
+          line-height: 1.6;
+          margin-bottom: 18px;
+        }
+
+        .highlight {
+          color: #ff5c7a;
+          font-weight: 600;
+        }
+
+        .omikujiWrapper {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 20px;
+        }
+
+        .omikujiCard {
+          width: 180px;
+          height: 240px;
+          border-radius: 24px;
+          border: 2px solid;
+          box-shadow: 0 16px 30px rgba(158, 158, 158, 0.22);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
+          padding-top: 22px;
+          animation: float 3s ease-in-out infinite;
+        }
+
+        .omikujiTop {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 10px;
+        }
+
+        .tag {
+          padding: 4px 12px;
+          border-radius: 999px;
+          font-size: 11px;
+          color: #ff7043;
+          background: rgba(255, 224, 187, 0.7);
+        }
+
+        .face {
+          font-size: 14px;
+          color: #999;
+          margin-bottom: 6px;
+        }
+
+        .level {
+          font-size: 56px;
+          font-weight: 700;
+          margin-bottom: 4px;
+        }
+
+        .smallText {
+          font-size: 11px;
+          color: #999;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+
+        .infoRow {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+
+        .pill {
+          flex: 1;
+          padding: 12px 14px;
+          border-radius: 999px;
+          background: #fafafa;
+          border: 1px solid #f1e5ff;
+        }
+
+        .pillLabel {
+          font-size: 11px;
+          color: #999;
+          margin-bottom: 4px;
+        }
+
+        .pillValue {
+          font-size: 14px;
+          font-weight: 500;
+          color: #555;
+        }
+
+        .drawButton {
+          width: 100%;
+          margin: 4px 0 10px;
+          padding: 12px 16px;
+          border-radius: 999px;
+          border: none;
+          outline: none;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          color: #fff;
+          background: linear-gradient(120deg, #ff5f6d, #ff8e53);
+          box-shadow: 0 12px 25px rgba(255, 111, 97, 0.4);
+          transition: transform 0.15s ease, box-shadow 0.15s ease,
+            opacity 0.15s ease;
+        }
+
+        .drawButton:hover:not(:disabled) {
+          transform: translateY(-1px) scale(1.01);
+          box-shadow: 0 16px 30px rgba(255, 111, 97, 0.46);
+        }
+
+        .drawButton:active:not(:disabled) {
+          transform: scale(0.96);
+          box-shadow: 0 8px 18px rgba(255, 111, 97, 0.36);
+        }
+
+        .drawButton:disabled {
+          opacity: 0.75;
+          cursor: default;
+        }
+
+        .tip {
+          text-align: center;
+          font-size: 11px;
+          color: #aaa;
+          line-height: 1.5;
+        }
+
+        @keyframes bgMove {
           0% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-5px);
+            transform: translate3d(0, 0, 0);
           }
           100% {
-            transform: translateY(0px);
+            transform: translate3d(-3%, 3%, 0);
           }
         }
 
-        @keyframes omikujiShake {
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-4px);
+          }
+        }
+
+        @keyframes shake {
           0% {
-            transform: translateY(-2px) rotate(0deg);
+            transform: translateX(0);
           }
-          20% {
-            transform: translateY(-2px) rotate(-4deg);
+          25% {
+            transform: translateX(-4px);
           }
-          40% {
-            transform: translateY(-2px) rotate(4deg);
+          50% {
+            transform: translateX(4px);
           }
-          60% {
-            transform: translateY(-2px) rotate(-3deg);
-          }
-          80% {
-            transform: translateY(-2px) rotate(3deg);
+          75% {
+            transform: translateX(-3px);
           }
           100% {
-            transform: translateY(-2px) rotate(0deg);
+            transform: translateX(0);
+          }
+        }
+
+        .omikujiWrapper--shake .omikujiCard {
+          animation: shake 0.35s ease;
+        }
+
+        @media (max-width: 480px) {
+          .card {
+            width: 340px;
+            padding: 22px 18px 22px;
+          }
+
+          .omikujiCard {
+            width: 160px;
+            height: 220px;
+          }
+
+          .infoRow {
+            flex-direction: column;
           }
         }
       `}</style>
-    </>
+    </div>
   );
 }
