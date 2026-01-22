@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, MouseEvent } from "react";
+import { useEffect, useState, MouseEvent, useRef } from "react";
 
 type Fortune = {
   date: string;
@@ -187,6 +187,7 @@ function getTodayString() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// 生成 / 读取「每台设备每天一签」
 function generateFortuneForToday(): Fortune {
   const today = getTodayString();
   const storageKey = `daily-fortune-v1-${today}`;
@@ -223,20 +224,58 @@ function generateFortuneForToday(): Fortune {
 export default function Home() {
   const [fortune, setFortune] = useState<Fortune | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
 
-  function fetchFortune() {
+  // 音效：摇签 + 抽到签
+  const shakeSoundRef = useRef<HTMLAudioElement | null>(null);
+  const resultSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // 这里的路径是 /public/sounds/ 里的文件
+      shakeSoundRef.current = new Audio("/sounds/shake.mp3");
+      resultSoundRef.current = new Audio("/sounds/result.mp3");
+    }
+  }, []);
+
+  function doFetchFortune(withEffects: boolean) {
     setLoading(true);
+
+    if (withEffects && shakeSoundRef.current) {
+      try {
+        shakeSoundRef.current.currentTime = 0;
+        shakeSoundRef.current.play();
+      } catch {
+        // 静默失败即可
+      }
+    }
+
+    if (withEffects) {
+      setIsShaking(true);
+    }
 
     // 模拟摇签时间，看起来更有仪式感一点
     setTimeout(() => {
       const ft = generateFortuneForToday();
       setFortune(ft);
       setLoading(false);
-    }, 500);
+      setIsShaking(false);
+
+      if (withEffects && resultSoundRef.current) {
+        try {
+          resultSoundRef.current.currentTime = 0;
+          resultSoundRef.current.play();
+        } catch {
+          // 静默失败
+        }
+      }
+    }, 600);
   }
 
+  // 首次加载：只生成签，不播声音、不摇动
   useEffect(() => {
-    fetchFortune();
+    doFetchFortune(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const bigLevel = fortune?.overall.level ?? "—";
@@ -261,295 +300,347 @@ export default function Home() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        background:
-          "radial-gradient(circle at 0% 0%, #fee2e2 0, transparent 45%), radial-gradient(circle at 100% 0%, #e0f2fe 0, transparent 45%), radial-gradient(circle at 50% 100%, #fef9c3 0, #f9fafb 55%)",
-        fontFamily:
-          'system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-      }}
-    >
+    <>
       <div
         style={{
-          position: "relative",
-          width: "360px",
-          maxWidth: "100%",
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          background:
+            "radial-gradient(circle at 0% 0%, #fee2e2 0, transparent 45%), radial-gradient(circle at 100% 0%, #e0f2fe 0, transparent 45%), radial-gradient(circle at 50% 100%, #fef9c3 0, #f9fafb 55%)",
+          fontFamily:
+            'system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
         }}
       >
-        {/* 顶部小鸟居 + 绳结 */}
-        <div
-          style={{
-            position: "absolute",
-            top: -32,
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              width: 120,
-              height: 32,
-              borderRadius: "999px",
-              background:
-                "linear-gradient(to right, #b91c1c, #dc2626, #b91c1c)",
-              boxShadow: "0 4px 10px rgba(185, 28, 28, 0.45)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fef2f2",
-              fontSize: 12,
-              letterSpacing: "0.2em",
-            }}
-          >
-            おみくじ
-          </div>
-          <div
-            style={{
-              width: 2,
-              height: 22,
-              background: theme.ribbon,
-              marginTop: 2,
-              borderRadius: 999,
-            }}
-          />
-        </div>
-
-        {/* 主容器 */}
         <div
           style={{
             position: "relative",
-            zIndex: 1,
-            background: "rgba(255, 255, 255, 0.96)",
-            borderRadius: 24,
-            padding: "30px 22px 18px",
-            boxShadow:
-              "0 20px 50px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(148, 163, 184, 0.25)",
-            backdropFilter: "blur(14px)",
+            width: "360px",
+            maxWidth: "100%",
           }}
         >
+          {/* 顶部小鸟居 + 绳结 */}
           <div
             style={{
+              position: "absolute",
+              top: -32,
+              left: "50%",
+              transform: "translateX(-50%)",
               display: "flex",
-              justifyContent: "space-between",
-              marginBottom: 14,
-              alignItems: "baseline",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 13,
-                color: "#6b7280",
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-              }}
-            >
-              今日抽签
-            </div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>{date}</div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              gap: 10,
-              marginBottom: 14,
+              pointerEvents: "none",
             }}
           >
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
+                width: 120,
+                height: 32,
+                borderRadius: "999px",
                 background:
-                  "radial-gradient(circle at 30% 20%, #fee2e2 0, #fecaca 20%, #f9fafb 65%)",
+                  "linear-gradient(to right, #b91c1c, #dc2626, #b91c1c)",
+                boxShadow: "0 4px 10px rgba(185, 28, 28, 0.45)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 18,
+                color: "#fef2f2",
+                fontSize: 12,
+                letterSpacing: "0.2em",
               }}
             >
-              🌸
+              おみくじ
             </div>
-            <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
-              今天是你的<span style={{ color: "#ef4444" }}> 专属一签</span>。
-              <br />
-              同一天你在这台设备上，不管抽多少次，都是这支签噢。
-            </div>
-          </div>
-
-          {/* 竖版和风小签纸 */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
             <div
               style={{
-                width: 140,
-                borderRadius: 16,
-                border: `2px solid ${theme.omikujiBorder}`,
-                background: theme.omikujiBg,
-                boxShadow:
-                  "0 10px 24px rgba(148, 163, 184, 0.35), 0 0 0 1px rgba(248, 250, 252, 0.9) inset",
-                padding: "14px 10px 10px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                position: "relative",
-                overflow: "hidden",
+                width: 2,
+                height: 22,
+                background: theme.ribbon,
+                marginTop: 2,
+                borderRadius: 999,
               }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 6,
-                  width: 34,
-                  height: 10,
-                  borderRadius: 999,
-                  border: `1px solid ${theme.ribbon}`,
-                  background:
-                    "radial-gradient(circle at 30% 10%, #fecaca 0, #fee2e2 40%, #ffffff 95%)",
-                }}
-              />
-              <div
-                style={{
-                  marginTop: 12,
-                  fontSize: 11,
-                  color: "#9ca3af",
-                  textAlign: "center",
-                  marginBottom: 4,
-                }}
-              >
-                {theme.face}
-              </div>
-              <div
-                style={{
-                  fontSize: 40,
-                  fontWeight: 800,
-                  letterSpacing: "0.32em",
-                  color: theme.omikujiText,
-                  writingMode: "vertical-rl" as any,
-                  textOrientation: "upright" as any,
-                  margin: "4px 0",
-                }}
-              >
-                {bigLevel}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#6b7280",
-                  marginTop: 4,
-                  textAlign: "center",
-                  lineHeight: 1.4,
-                }}
-              >
-                おみくじ
-                <br />
-                今日のきっぷ
-              </div>
-            </div>
+            />
           </div>
 
-          {fortune && (
+          {/* 主容器 */}
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              background: "rgba(255, 255, 255, 0.96)",
+              borderRadius: 24,
+              padding: "30px 22px 18px",
+              boxShadow:
+                "0 20px 50px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(148, 163, 184, 0.25)",
+              backdropFilter: "blur(14px)",
+            }}
+          >
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                gap: 10,
-                fontSize: 12,
-                color: "#6b7280",
-                marginBottom: 12,
+                marginBottom: 14,
+                alignItems: "baseline",
               }}
             >
               <div
                 style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 14,
-                  background: "rgba(248, 250, 252, 0.98)",
-                  border: "1px solid rgba(226, 232, 240, 0.9)",
+                  fontSize: 13,
+                  color: "#6b7280",
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
                 }}
               >
-                <div
-                  style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-                >
-                  幸运颜色
-                </div>
-                <div>{luckyColor}</div>
+                今日抽签
               </div>
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>{date}</div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 14,
+              }}
+            >
               <div
                 style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 14,
-                  background: "rgba(248, 250, 252, 0.98)",
-                  border: "1px solid rgba(226, 232, 240, 0.9)",
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(circle at 30% 20%, #fee2e2 0, #fecaca 20%, #f9fafb 65%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 18,
+                }}
+              >
+                🌸
+              </div>
+              <div
+                style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}
+              >
+                今天是你的<span style={{ color: "#ef4444" }}> 专属一签</span>。
+                <br />
+                同一天你在这台设备上，不管抽多少次，都是这支签噢。
+              </div>
+            </div>
+
+            {/* 竖版和风小签纸 */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginBottom: 16,
+              }}
+            >
+              <div
+                className="omikuji-card"
+                style={{
+                  width: 140,
+                  borderRadius: 16,
+                  border: `2px solid ${theme.omikujiBorder}`,
+                  background: theme.omikujiBg,
+                  boxShadow:
+                    "0 10px 24px rgba(148, 163, 184, 0.35), 0 0 0 1px rgba(248, 250, 252, 0.9) inset",
+                  padding: "14px 10px 10px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  position: "relative",
+                  overflow: "hidden",
+                  animation: isShaking
+                    ? "omikujiShake 0.4s ease-in-out infinite"
+                    : "omikujiFloat 4s ease-in-out infinite",
                 }}
               >
                 <div
-                  style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    width: 34,
+                    height: 10,
+                    borderRadius: 999,
+                    border: `1px solid ${theme.ribbon}`,
+                    background:
+                      "radial-gradient(circle at 30% 10%, #fecaca 0, #fee2e2 40%, #ffffff 95%)",
+                  }}
+                />
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 11,
+                    color: "#9ca3af",
+                    textAlign: "center",
+                    marginBottom: 4,
+                  }}
                 >
-                  幸运数字
+                  {theme.face}
                 </div>
-                <div>{luckyNumber}</div>
+                <div
+                  style={{
+                    fontSize: 40,
+                    fontWeight: 800,
+                    letterSpacing: "0.32em",
+                    color: theme.omikujiText,
+                    writingMode: "vertical-rl" as any,
+                    textOrientation: "upright" as any,
+                    margin: "4px 0",
+                  }}
+                >
+                  {bigLevel}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#6b7280",
+                    marginTop: 4,
+                    textAlign: "center",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  おみくじ
+                  <br />
+                  今日のきっぷ
+                </div>
               </div>
             </div>
-          )}
 
-          <button
-            onClick={fetchFortune}
-            disabled={loading}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
-            style={{
-              width: "100%",
-              padding: "10px 0",
-              borderRadius: 999,
-              border: "none",
-              background:
-                "linear-gradient(to right, #b91c1c, #ef4444, #f97316)",
-              color: "#fef2f2",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: loading ? "default" : "pointer",
-              opacity: loading ? 0.8 : 1,
-              boxShadow: "0 10px 28px rgba(127, 29, 29, 0.45)",
-              transition:
-                "transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease",
-            }}
-          >
-            {loading ? "摇签中…" : "再摇一次签筒"}
-          </button>
+            {fortune && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  fontSize: 12,
+                  color: "#6b7280",
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 14,
+                    background: "rgba(248, 250, 252, 0.98)",
+                    border: "1px solid rgba(226, 232, 240, 0.9)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#9ca3af",
+                      marginBottom: 2,
+                    }}
+                  >
+                    幸运颜色
+                  </div>
+                  <div>{luckyColor}</div>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 14,
+                    background: "rgba(248, 250, 252, 0.98)",
+                    border: "1px solid rgba(226, 232, 240, 0.9)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#9ca3af",
+                      marginBottom: 2,
+                    }}
+                  >
+                    幸运数字
+                  </div>
+                  <div>{luckyNumber}</div>
+                </div>
+              </div>
+            )}
 
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 10,
-              color: "#9ca3af",
-              textAlign: "center",
-              lineHeight: 1.5,
-            }}
-          >
-            小提示：每台设备、每天一支签。
-            <br />
-            换一个人 / 换一台设备，抽到的很可能就不一样啦。
+            <button
+              onClick={() => doFetchFortune(true)}
+              disabled={loading}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              style={{
+                width: "100%",
+                padding: "10px 0",
+                borderRadius: 999,
+                border: "none",
+                background:
+                  "linear-gradient(to right, #b91c1c, #ef4444, #f97316)",
+                color: "#fef2f2",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: loading ? "default" : "pointer",
+                opacity: loading ? 0.8 : 1,
+                boxShadow: "0 10px 28px rgba(127, 29, 29, 0.45)",
+                transition:
+                  "transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease",
+              }}
+            >
+              {loading ? "摇签中…" : "再摇一次签筒"}
+            </button>
+
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 10,
+                color: "#9ca3af",
+                textAlign: "center",
+                lineHeight: 1.5,
+              }}
+            >
+              小提示：每台设备、每天一支签。
+              <br />
+              换一个人 / 换一台设备，抽到的很可能就不一样啦。
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* 全局动效 keyframes */}
+      <style jsx global>{`
+        @keyframes omikujiFloat {
+          0% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-5px);
+          }
+          100% {
+            transform: translateY(0px);
+          }
+        }
+
+        @keyframes omikujiShake {
+          0% {
+            transform: translateY(-2px) rotate(0deg);
+          }
+          20% {
+            transform: translateY(-2px) rotate(-4deg);
+          }
+          40% {
+            transform: translateY(-2px) rotate(4deg);
+          }
+          60% {
+            transform: translateY(-2px) rotate(-3deg);
+          }
+          80% {
+            transform: translateY(-2px) rotate(3deg);
+          }
+          100% {
+            transform: translateY(-2px) rotate(0deg);
+          }
+        }
+      `}</style>
+    </>
   );
 }
